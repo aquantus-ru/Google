@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Search Engine</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .stats { background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        form { margin-bottom: 20px; }
+        input[type="text"] { width: 70%; padding: 10px; font-size: 16px; }
+        input[type="submit"] { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>My Search Engine</h1>
+
+    <div class="stats">
+        <h3>System Status</h3>
+        <p>Indexed Pages: {{ stats.indexed_pages }}</p>
+        <p>Crawler Queue: {{ stats.queue_size }}</p>
+    </div>
+
+    <form action="/search" method="get">
+        <input type="text" name="q" placeholder="Enter keywords..." required>
+        <input type="submit" value="Search">
+    </form>
+</body>
+</html>

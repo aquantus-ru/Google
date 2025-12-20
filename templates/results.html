@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results - {{ query }}</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .result { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .result h3 { margin: 0; }
+        .result a { text-decoration: none; color: #1a0dab; }
+        .result .url { color: #006621; font-size: 14px; }
+        .result .snippet { font-size: 14px; color: #545454; }
+        .back { margin-bottom: 20px; display: block; }
+    </style>
+</head>
+<body>
+    <a href="/" class="back">&larr; Back to Search</a>
+
+    <h1>Results for "{{ query }}"</h1>
+
+    {% if results %}
+        {% for url, title, snippet in results %}
+        <div class="result">
+            <h3><a href="{{ url }}">{{ title }}</a></h3>
+            <div class="url">{{ url }}</div>
+            <div class="snippet">{{ snippet|safe }}</div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No results found.</p>
+    {% endif %}
+</body>
+</html>
