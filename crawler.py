@@ -5,6 +5,8 @@ import concurrent.futures
 import threading
 from database import Database
 import os
+import re
+import xml.etree.ElementTree as ET
 
 class Crawler:
     def __init__(self, db: Database, max_workers=5):
@@ -14,10 +16,19 @@ class Crawler:
         self.lock = threading.Lock()
         self.queue = []
         self.discovered_file = "discovered.txt"
+        self.known_domains = set()
 
-        # Ensure discovered.txt exists
+        # Ensure discovered.txt exists and load known domains
         if not os.path.exists(self.discovered_file):
             open(self.discovered_file, 'w').close()
+
+        self._load_known_domains()
+
+    def _load_known_domains(self):
+        if os.path.exists(self.discovered_file):
+            with open(self.discovered_file, 'r') as f:
+                for line in f:
+                    self.known_domains.add(line.strip())
 
     def load_seeds(self, seeds_file="seeds.txt"):
         """Loads URLs from seeds.txt into the queue."""
@@ -73,7 +84,17 @@ class Crawler:
                 print(f"Failed to fetch {url}: Status {response.status_code}")
                 return []
 
-            if 'text/html' not in response.headers.get('Content-Type', ''):
+            content_type = response.headers.get('Content-Type', '')
+
+            # Check for robots.txt
+            if url.endswith('/robots.txt'):
+                 return self.process_robots_txt(response.text)
+
+            # Check for sitemap
+            if url.endswith('.xml') or 'xml' in content_type:
+                return self.process_sitemap(response.content)
+
+            if 'text/html' not in content_type:
                 return []
 
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -104,7 +125,8 @@ class Crawler:
 
                     # Check for new domain
                     domain = parsed_url.netloc
-                    self._check_new_domain(domain)
+                    discovery_links = self._check_new_domain(domain, parsed_url.scheme)
+                    links.extend(discovery_links)
 
             return links
 
@@ -112,22 +134,48 @@ class Crawler:
             print(f"Exception crawling {url}: {e}")
             return []
 
-    def _check_new_domain(self, domain):
-        """Appends new domains to discovered.txt."""
-        if not hasattr(self, 'known_domains'):
-             # Load existing domains from file
-             self.known_domains = set()
-             if os.path.exists(self.discovered_file):
-                 with open(self.discovered_file, 'r') as f:
-                     for line in f:
-                         self.known_domains.add(line.strip())
+    def process_robots_txt(self, content):
+        """Parses robots.txt to find Sitemap URLs."""
+        sitemaps = []
+        for line in content.splitlines():
+            if line.lower().startswith('sitemap:'):
+                parts = line.split(':', 1)
+                if len(parts) > 1:
+                    sitemaps.append(parts[1].strip())
+        return sitemaps
 
+    def process_sitemap(self, content):
+        """Parses sitemap XML to find URLs."""
+        urls = []
+        try:
+            root = ET.fromstring(content)
+            # Handle default namespace usually found in sitemaps
+            # XML tags often look like {http://www.sitemaps.org/schemas/sitemap/0.9}url
+            # We can strip namespace or just search for 'loc'
+
+            for url in root.findall('.//{*}loc'):
+                if url.text:
+                    urls.append(url.text.strip())
+
+        except ET.ParseError as e:
+             print(f"Error parsing sitemap: {e}")
+
+        return urls
+
+    def _check_new_domain(self, domain, scheme='http'):
+        """Appends new domains to discovered.txt and returns discovery URLs."""
+        new_urls = []
         if domain not in self.known_domains:
             with self.lock:
                 if domain not in self.known_domains: # Double check locking
                     self.known_domains.add(domain)
                     with open(self.discovered_file, 'a') as f:
                         f.write(domain + '\n')
+
+                    # Add robots.txt and sitemap.xml to discovery list
+                    new_urls.append(f"{scheme}://{domain}/robots.txt")
+                    new_urls.append(f"{scheme}://{domain}/sitemap.xml")
+        return new_urls
 
     def get_queue_size(self):
         with self.lock:
