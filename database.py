@@ -112,6 +112,46 @@ class Database:
             conn.close()
         return count
 
+
+    def get_all_pages(self, limit=100, offset=0):
+        """Retrieves a list of pages for the explore view."""
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        try:
+            # fts5 has an implicit rowid
+            c.execute("SELECT rowid, url, title FROM pages LIMIT ? OFFSET ?", (limit, offset))
+            results = c.fetchall()
+        except Exception as e:
+            print(f"Error getting pages: {e}")
+            results = []
+        finally:
+            conn.close()
+        return results
+
+    def get_page(self, rowid):
+        """Retrieves a specific page's full details."""
+        conn = sqlite3.connect(self.db_file)
+        c = conn.cursor()
+        try:
+            c.execute("SELECT rowid, url, title, content FROM pages WHERE rowid=?", (rowid,))
+            result = c.fetchone()
+        except Exception as e:
+            print(f"Error getting page: {e}")
+            result = None
+        finally:
+            conn.close()
+        return result
+
+    def update_page(self, rowid, url, title, content):
+        """Queues a page update."""
+        query = "UPDATE pages SET url=?, title=?, content=? WHERE rowid=?"
+        self.write_queue.put((query, (url, title, content, rowid)))
+
+    def delete_page(self, rowid):
+        """Queues a page deletion."""
+        query = "DELETE FROM pages WHERE rowid=?"
+        self.write_queue.put((query, (rowid,)))
+
     def close(self):
         """Stops the writer thread and closes connection."""
         self.running = False
