@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import threading
 
 class WebInterface:
@@ -24,6 +24,46 @@ class WebInterface:
             if query:
                 results = self.db.search(query)
             return render_template('results.html', query=query, results=results)
+
+
+        @self.app.route('/explore')
+        def explore():
+            pages = self.db.get_all_pages()
+            return render_template('explore.html', pages=pages)
+
+        @self.app.route('/explore/add', methods=['GET', 'POST'])
+        def add_page():
+            if request.method == 'POST':
+                url = request.form.get('url')
+                title = request.form.get('title')
+                content = request.form.get('content')
+                if url and title and content:
+                    self.db.insert_page(url, title, content)
+                return redirect(url_for('explore'))
+            return render_template('page_form.html', action="Add")
+
+        @self.app.route('/explore/edit/<int:rowid>', methods=['GET', 'POST'])
+        def edit_page(rowid):
+            if request.method == 'POST':
+                url = request.form.get('url')
+                title = request.form.get('title')
+                content = request.form.get('content')
+                if url and title and content:
+                    self.db.update_page(rowid, url, title, content)
+                return redirect(url_for('explore'))
+
+            page = self.db.get_page(rowid)
+            if not page:
+                return redirect(url_for('explore'))
+
+            # Create a dictionary-like object to pass to template
+            page_data = {'rowid': page[0], 'url': page[1], 'title': page[2], 'content': page[3]}
+            return render_template('page_form.html', action="Edit", page=page_data)
+
+        @self.app.route('/explore/delete/<int:rowid>', methods=['POST'])
+        def delete_page(rowid):
+            self.db.delete_page(rowid)
+            return redirect(url_for('explore'))
 
         @self.app.route('/status')
         def status():
